@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { superAdminAPI } from "../../api/api.js";
+import { orderAPI, superAdminAPI } from "../../api/api.js";
 import { useDispatch, useSelector } from "react-redux";
 
 const SuperAdminPage = () => {
@@ -14,6 +14,7 @@ const SuperAdminPage = () => {
     const [sellers, setSellers] = useState([]);
     const [products, setProducts] = useState([]);
     const [advertisements, setAdvertisements] = useState([]);
+    const [orders, setOrders] = useState([]);
 
     const [selectedRequest, setSelectedRequest] = useState(null);
     const [selectedAdvertisement, setSelectedAdvertisement] = useState(null);
@@ -411,6 +412,7 @@ const SuperAdminPage = () => {
         statusFilter
     ]);
 
+    //  Get Advertisement
     useEffect(() => {
 
         const getAdvertisement = async () => {
@@ -420,9 +422,24 @@ const SuperAdminPage = () => {
             console.log("Adres", advertisementResponse);
 
             setAdvertisements(advertisementResponse?.data?.advertisements);
-        }
+        };
 
         getAdvertisement();
+    }, []);
+
+    // Get Placed Orders
+    useEffect(() => {
+        console.log("Orderwo");
+
+        const getPlacedOrders = async () => {
+            console.log("Orderwork", user._id);
+            const response = await orderAPI.getOrders(user._id);
+
+            console.log("Orders", response);
+
+        };
+
+        getPlacedOrders();
     }, []);
 
     // =========================================================
@@ -1421,9 +1438,113 @@ const SuperAdminPage = () => {
                     )}
 
                     {/* =================================================
+                        PRODUCTS
+                    =================================================  */}
+                    {activeTab === "orders" && (
+                        <div>
+                            <div className="mb-6">
+                                <h2 className="text-2xl font-semibold">
+                                    Orders
+                                </h2>
+                                <p className="text-sm text-gray-500 mt-1">
+                                    Orders are placed by Buyers.
+                                </p>
+                            </div>
+
+                            {orders.length === 0 ? (
+                                <div className="bg-white border rounded-xl p-10 text-center text-gray-500">
+                                    No products found.
+                                </div>
+                            ) : (
+                                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+                                    {orders.map((product) => (
+                                        <div
+                                            key={product._id}
+                                            className="bg-white border rounded-2xl overflow-hidden"
+                                        >
+                                            <div className="relative h-52 bg-gray-100">
+                                                <img
+                                                    src={
+                                                        product.images?.[0] ||
+                                                        "/default-product.png"
+                                                    }
+                                                    alt={product.name}
+                                                    className="w-full h-full object-cover"
+                                                />
+
+                                                <span
+                                                    className={`absolute top-3 right-3 px-3 py-1 rounded-full text-xs font-semibold ${getStatusClass(
+                                                        product.status
+                                                    )}`}
+                                                >
+                                                    {product.status}
+                                                </span>
+                                            </div>
+
+                                            <div className="p-5">
+                                                <div className="flex justify-between gap-3">
+                                                    <h3 className="font-semibold">
+                                                        {product.name}
+                                                    </h3>
+
+                                                    <span className="font-bold">
+                                                        ₹
+                                                        {Number(
+                                                            product.price || 0
+                                                        ).toLocaleString(
+                                                            "en-IN"
+                                                        )}
+                                                    </span>
+                                                </div>
+
+                                                <p className="text-sm text-gray-500 mt-3 line-clamp-3">
+                                                    {product.description ||
+                                                        "No description."}
+                                                </p>
+                                            </div>
+
+                                            {product.status === "pending" && (
+                                                <div className="px-5 py-4 bg-gray-50 border-t flex justify-end gap-2">
+                                                    <button
+                                                        type="button"
+                                                        disabled={actionLoading}
+                                                        onClick={() =>
+                                                            productStatus(
+                                                                product._id,
+                                                                1,
+                                                                ""
+                                                            )
+                                                        }
+                                                        className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm disabled:opacity-50"
+                                                    >
+                                                        Approve
+                                                    </button>
+
+                                                    <button
+                                                        type="button"
+                                                        disabled={actionLoading}
+                                                        onClick={() =>
+                                                            handleRejectProduct(
+                                                                product
+                                                            )
+                                                        }
+                                                        className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm disabled:opacity-50"
+                                                    >
+                                                        Reject
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* =================================================
                         PLACEHOLDER TABS
                     ================================================= */}
-                    {["admins", "buyers", "orders", "settings"].includes(
+                    {["admins", "buyers", "settings"].includes(
                         activeTab
                     ) && (
                             <div className="bg-white border rounded-xl p-8">

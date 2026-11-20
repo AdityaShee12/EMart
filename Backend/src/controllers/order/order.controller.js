@@ -226,11 +226,52 @@ const createOrder = async (req, res) => {
 };
 
 // Get logged-in buyer's orders
-
 const getMyOrders = async (req, res) => {
   try {
 
-   const { userId } = req.query;
+    const { userId } = req.query;
+    console.log("UserId", userId);
+
+    // Validate userId
+    if (!userId || !mongoose.isValidObjectId(userId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Valid userId is required",
+      });
+    }
+
+    // Fetch user's orders
+    const orders = await Order.find({
+      buyerId: userId,
+    })
+      .populate("productId", "name images")
+      .sort({ createdAt: -1 })
+      .lean();
+
+    return res.status(200).json({
+      success: true,
+      message: "Orders fetched successfully",
+      data: {
+        orders,
+      },
+    });
+
+  } catch (error) {
+
+    console.error("getMyOrders:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch orders",
+    });
+  }
+};
+
+const getOrders = async (req, res) => {
+  try {
+
+    const { userId } = req.query;
+    console.log("UserId", userId);
 
     // Validate userId
     if (!userId || !mongoose.isValidObjectId(userId)) {
@@ -430,4 +471,4 @@ const updateOrderStatus = async (req, res) => {
   }
 };
 
-export { createOrder, getMyOrders, getOrderById, cancelMyOrder, updateOrderStatus };
+export { createOrder, getOrders, getMyOrders, getOrderById, cancelMyOrder, updateOrderStatus };

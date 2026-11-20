@@ -462,7 +462,7 @@ export const orderAPI = {
         ),
 
     // Get All Orders
-    getOrders: async ({ userId }) =>
+    getOrders: async ({ userId }) => 
         apiRequest(() =>
             api.get("orders/getOrders", {
                 params: { userId }

@@ -1,6 +1,7 @@
 import { Router } from "express";
 import {
   createOrder,
+  getOrders,
   getMyOrders,
   getOrderById,
   cancelMyOrder,
@@ -11,7 +12,7 @@ import { verifyJWT } from "../middlewires/auth/auth.middleware.js";
 const router = Router();
 
 router.post("/create", createOrder);
-router.get("/getOrders", getMyOrders);
+router.get("/getOrders", getOrders);
 
 
 export default router;
