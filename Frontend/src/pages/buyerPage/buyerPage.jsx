@@ -9,6 +9,8 @@ import "swiper/css/autoplay";
 import { useDispatch, useSelector } from "react-redux";
 import { setProduct } from "../../features/productSlice";
 import NavBar from "../navBar/navBar";
+import { subscribeToPush } from "../../utils/pushNotification";
+import { notificationAPI } from "../../api/api";
 
 const BuyerPage = () => {
 
@@ -24,11 +26,30 @@ const BuyerPage = () => {
     (state) => state.user,
   );
 
-  // Destructure user details 
   useEffect(() => {
-    console.log("User", user);
-  }, [user]);
 
+    const handleNotification = async () => {
+      try {
+        setLoading(true);
+
+        await subscribeToPush(notificationAPI);
+
+        alert("Notification Enabled Successfully!");
+
+      } catch (error) {
+        console.error(error);
+
+        alert(
+          error.message || "Failed to enable notification"
+        );
+
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    handleNotification();
+  }, [])
   // Fetch Products
   useEffect(() => {
 

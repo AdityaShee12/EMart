@@ -4,7 +4,6 @@ import webpush from "../../config/webPush.js";
 // 1. Get VAPID Public Key
 export const getPublicKey = (req, res) => {
   try {
-    console.log("PublicKey", process.env.VAPID_PUBLIC_KEY);
 
     return res.status(200).json({
       success: true,
