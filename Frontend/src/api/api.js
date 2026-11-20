@@ -462,23 +462,23 @@ export const orderAPI = {
         ),
 
     // Get All Orders
-    getOrders: async ({ userId }) => 
+    getOrders: async (userId) =>
         apiRequest(() =>
             api.get("orders/getOrders", {
                 params: { userId }
             })
         ),
 
+    // Update All Orders
+    updateOrder: async (orderId, updateData) =>
+        apiRequest(() =>
+            api.patch(`orders/updateOrders/${orderId}`, updateData)
+        ),
+
     // Get Single Order By ID
     getOrderById: async (orderId) =>
         apiRequest(() =>
             api.get(`orders/getOrder/${orderId}`)
-        ),
-
-    // Update Order
-    updateOrder: async (orderId, updateData) =>
-        apiRequest(() =>
-            api.patch(`orders/updateOrder/${orderId}`, updateData)
         ),
 
     // Cancel Order

@@ -15,6 +15,9 @@ const SuperAdminPage = () => {
     const [products, setProducts] = useState([]);
     const [advertisements, setAdvertisements] = useState([]);
     const [orders, setOrders] = useState([]);
+    const [pagination, setPagination] = useState({});
+    const [updatingOrderId, setUpdatingOrderId] = useState(null);
+    const [orderStatusDrafts, setOrderStatusDrafts] = useState({});
 
     const [selectedRequest, setSelectedRequest] = useState(null);
     const [selectedAdvertisement, setSelectedAdvertisement] = useState(null);
@@ -429,14 +432,25 @@ const SuperAdminPage = () => {
 
     // Get Placed Orders
     useEffect(() => {
-        console.log("Orderwo");
 
         const getPlacedOrders = async () => {
-            console.log("Orderwork", user._id);
-            const response = await orderAPI.getOrders(user._id);
+            try {
+                setLoading(true);
 
-            console.log("Orders", response);
+                const response = await orderAPI.getOrders(1, 10);
 
+                console.log("Orders:", response);
+
+                if (response?.success) {
+                    setOrders(response.data.orders || []);
+                    setPagination(response.data.pagination || {});
+                }
+
+            } catch (error) {
+                console.error("Error fetching orders:", error);
+            } finally {
+                setLoading(false);
+            }
         };
 
         getPlacedOrders();
@@ -723,6 +737,68 @@ const SuperAdminPage = () => {
         }
 
         return "bg-gray-100 text-gray-600";
+    };
+
+    const orderStatuses = [
+        "pending",
+        "confirmed",
+        "processing",
+        "shipped",
+        "cancelled",
+        "returned"
+    ];
+
+    // Dropdown Change
+    const handleOrderStatusChange = (orderId, status) => {
+        setOrderStatusDrafts((prev) => ({
+            ...prev,
+            [orderId]: status
+        }));
+    };
+
+    // Update Order Status
+    const handleUpdateOrderStatus = async (orderId) => {
+        try {
+            console.log("oId", orderId);
+            const newStatus = orderStatusDrafts[orderId];
+
+            if (!newStatus) return;
+
+            setUpdatingOrderId(orderId);
+
+            const response = await orderAPI.updateOrder(
+                orderId,
+                { status: newStatus }
+            );
+
+            if (response?.success) {
+
+                setOrders((prevOrders) =>
+                    prevOrders.map((order) =>
+                        order._id === orderId
+                            ? { ...order, status: newStatus }
+                            : order
+                    )
+                );
+
+                setOrderStatusDrafts((prev) => {
+                    const updated = { ...prev };
+                    delete updated[orderId];
+                    return updated;
+                });
+
+                alert("Order status updated successfully!");
+
+            } else {
+                alert(response?.message || "Failed to update order status");
+            }
+
+        } catch (error) {
+            console.error("Update Order Error:", error);
+            alert("Something went wrong while updating order status.");
+        } finally {
+            setUpdatingOrderId(null);
+        }
     };
 
     // =========================================================
@@ -1438,106 +1514,429 @@ const SuperAdminPage = () => {
                     )}
 
                     {/* =================================================
-                        PRODUCTS
+                        ORDERS
                     =================================================  */}
                     {activeTab === "orders" && (
                         <div>
+
+                            {/* Header */}
                             <div className="mb-6">
+
                                 <h2 className="text-2xl font-semibold">
-                                    Orders
+                                    All Orders
                                 </h2>
+
                                 <p className="text-sm text-gray-500 mt-1">
-                                    Orders are placed by Buyers.
+                                    Manage all orders placed by buyers.
                                 </p>
+
+                                <p className="text-sm font-medium mt-2">
+                                    Total Orders: {pagination.totalOrders || 0}
+                                </p>
+
                             </div>
 
-                            {orders.length === 0 ? (
+                            {/* Loading */}
+                            {loading ? (
+
+                                <div className="text-center py-10 text-gray-500">
+                                    Loading orders...
+                                </div>
+
+                            ) : orders.length === 0 ? (
+
                                 <div className="bg-white border rounded-xl p-10 text-center text-gray-500">
-                                    No products found.
+                                    No orders found.
                                 </div>
+
                             ) : (
+
+                                /* Orders Grid */
                                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-                                    {orders.map((product) => (
-                                        <div
-                                            key={product._id}
-                                            className="bg-white border rounded-2xl overflow-hidden"
-                                        >
-                                            <div className="relative h-52 bg-gray-100">
-                                                <img
-                                                    src={
-                                                        product.images?.[0] ||
-                                                        "/default-product.png"
-                                                    }
-                                                    alt={product.name}
-                                                    className="w-full h-full object-cover"
-                                                />
 
-                                                <span
-                                                    className={`absolute top-3 right-3 px-3 py-1 rounded-full text-xs font-semibold ${getStatusClass(
-                                                        product.status
-                                                    )}`}
-                                                >
-                                                    {product.status}
-                                                </span>
-                                            </div>
+                                    {orders.map((order) => {
 
-                                            <div className="p-5">
-                                                <div className="flex justify-between gap-3">
-                                                    <h3 className="font-semibold">
-                                                        {product.name}
-                                                    </h3>
+                                        const product = order.productId;
+                                        const buyer = order.buyerId;
+                                        const seller = product?.sellerId;
 
-                                                    <span className="font-bold">
-                                                        ₹
-                                                        {Number(
-                                                            product.price || 0
-                                                        ).toLocaleString(
-                                                            "en-IN"
-                                                        )}
+                                        const selectedStatus =
+                                            orderStatusDrafts[order._id] ?? order.status;
+
+                                        const isStatusChanged =
+                                            selectedStatus !== order.status;
+
+                                        const isUpdating =
+                                            updatingOrderId === order._id;
+
+                                        return (
+
+                                            <div
+                                                key={order._id}
+                                                className="bg-white border rounded-2xl overflow-hidden shadow-sm"
+                                            >
+
+                                                {/* Product Image */}
+                                                <div className="relative h-52 bg-gray-100">
+
+                                                    <img
+                                                        src={
+                                                            product?.images?.[0] ||
+                                                            "/default-product.png"
+                                                        }
+                                                        alt={product?.name || "Product"}
+                                                        className="w-full h-full object-cover"
+                                                    />
+
+                                                    {/* Current Status Badge */}
+                                                    <span
+                                                        className={`absolute top-3 right-3 px-3 py-1 rounded-full text-xs font-semibold ${getStatusClass(
+                                                            order.status
+                                                        )}`}
+                                                    >
+                                                        {order.status}
                                                     </span>
+
                                                 </div>
 
-                                                <p className="text-sm text-gray-500 mt-3 line-clamp-3">
-                                                    {product.description ||
-                                                        "No description."}
-                                                </p>
+                                                {/* Order Information */}
+                                                <div className="p-5">
+
+                                                    {/* Product Name & Amount */}
+                                                    <div className="flex justify-between gap-3">
+
+                                                        <h3 className="font-semibold">
+                                                            {product?.name || "Product unavailable"}
+                                                        </h3>
+
+                                                        <span className="font-bold whitespace-nowrap">
+                                                            ₹{Number(
+                                                                order.totalAmount || 0
+                                                            ).toLocaleString("en-IN")}
+                                                        </span>
+
+                                                    </div>
+
+                                                    <p className="text-xs text-gray-400 mt-2 break-all">
+                                                        Order ID: {order._id}
+                                                    </p>
+
+                                                    <div className="border-t my-4" />
+
+                                                    {/* Buyer Information */}
+                                                    <div className="space-y-2 text-sm">
+
+                                                        <h4 className="font-semibold text-gray-800">
+                                                            Buyer Information
+                                                        </h4>
+
+                                                        <p className="text-gray-600">
+                                                            Name: {buyer?.name || "N/A"}
+                                                        </p>
+
+                                                        <p className="text-gray-600 break-all">
+                                                            Email: {buyer?.email || "N/A"}
+                                                        </p>
+
+                                                        {/* Seller Information */}
+                                                        <h4 className="font-semibold text-gray-800 pt-2">
+                                                            Seller Information
+                                                        </h4>
+
+                                                        <p className="text-gray-600">
+                                                            Name: {seller?.name || "N/A"}
+                                                        </p>
+
+                                                        <p className="text-gray-600 break-all">
+                                                            Email: {seller?.email || "N/A"}
+                                                        </p>
+
+                                                    </div>
+
+                                                    <div className="border-t my-4" />
+
+                                                    {/* Order Details */}
+                                                    <div className="grid grid-cols-2 gap-3 text-sm">
+
+                                                        <div>
+                                                            <p className="text-gray-500">
+                                                                Quantity
+                                                            </p>
+
+                                                            <p className="font-semibold">
+                                                                {order.quantity}
+                                                            </p>
+                                                        </div>
+
+                                                        <div>
+                                                            <p className="text-gray-500">
+                                                                Unit Price
+                                                            </p>
+
+                                                            <p className="font-semibold">
+                                                                ₹{Number(
+                                                                    order.unitPrice || 0
+                                                                ).toLocaleString("en-IN")}
+                                                            </p>
+                                                        </div>
+
+                                                        <div>
+                                                            <p className="text-gray-500">
+                                                                Payment Method
+                                                            </p>
+
+                                                            <p className="font-semibold uppercase">
+                                                                {order.paymentMethod}
+                                                            </p>
+                                                        </div>
+
+                                                        <div>
+                                                            <p className="text-gray-500">
+                                                                Payment Status
+                                                            </p>
+
+                                                            <p className="font-semibold capitalize">
+                                                                {order.paymentStatus}
+                                                            </p>
+                                                        </div>
+
+                                                        <div>
+                                                            <p className="text-gray-500">
+                                                                Delivery Charge
+                                                            </p>
+
+                                                            <p className="font-semibold">
+                                                                ₹{Number(
+                                                                    order.deliveryCharge || 0
+                                                                ).toLocaleString("en-IN")}
+                                                            </p>
+                                                        </div>
+
+                                                    </div>
+
+                                                    {/* Delivery Address */}
+                                                    <div className="border-t my-4" />
+
+                                                    <h4 className="font-semibold text-sm mb-2">
+                                                        Delivery Address
+                                                    </h4>
+
+                                                    <p className="text-sm text-gray-500">
+                                                        {order.shippingAddress?.name},
+                                                        {" "}
+                                                        {order.shippingAddress?.addressLine},
+                                                        {" "}
+                                                        {order.shippingAddress?.city},
+                                                        {" "}
+                                                        {order.shippingAddress?.state},
+                                                        {" "}
+                                                        {order.shippingAddress?.postalCode},
+                                                        {" "}
+                                                        {order.shippingAddress?.country}
+                                                    </p>
+
+                                                    <p className="text-sm text-gray-500 mt-1">
+                                                        Phone: {order.shippingAddress?.phone}
+                                                    </p>
+
+                                                    {/* Order Date */}
+                                                    <p className="text-xs text-gray-400 mt-4">
+                                                        Ordered on:{" "}
+                                                        {order.createdAt
+                                                            ? new Date(
+                                                                order.createdAt
+                                                            ).toLocaleDateString("en-IN")
+                                                            : "N/A"}
+                                                    </p>
+
+                                                    {/* ================================= */}
+                                                    {/* ORDER STATUS MANAGEMENT */}
+                                                    {/* ================================= */}
+
+                                                    <div className="border-t mt-5 pt-5">
+
+                                                        <div className="flex items-center justify-between mb-4">
+
+                                                            <h4 className="font-semibold text-gray-800">
+                                                                Manage Order Status
+                                                            </h4>
+
+                                                            <span
+                                                                className={`px-2.5 py-1 rounded-full text-xs font-semibold ${getStatusClass(
+                                                                    order.status
+                                                                )}`}
+                                                            >
+                                                                {order.status}
+                                                            </span>
+
+                                                        </div>
+
+                                                        {/* Status Dropdown */}
+                                                        <div className="space-y-3">
+
+                                                            <div>
+
+                                                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                                    Select New Status
+                                                                </label>
+
+                                                                <select
+                                                                    value={selectedStatus}
+                                                                    onChange={(e) =>
+                                                                        handleOrderStatusChange(
+                                                                            order._id,
+                                                                            e.target.value
+                                                                        )
+                                                                    }
+                                                                    disabled={isUpdating}
+                                                                    className="w-full border border-gray-300 rounded-lg px-3 py-3 text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100"
+                                                                >
+
+                                                                    {orderStatuses.map((status) => (
+
+                                                                        <option
+                                                                            key={status}
+                                                                            value={status}
+                                                                        >
+                                                                            {status.charAt(0).toUpperCase() +
+                                                                                status.slice(1)}
+                                                                        </option>
+
+                                                                    ))}
+
+                                                                </select>
+
+                                                            </div>
+
+                                                            {/* Selected Status Preview */}
+                                                            {isStatusChanged && (
+
+                                                                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+
+                                                                    <p className="text-xs text-blue-700">
+                                                                        Status will change from
+                                                                    </p>
+
+                                                                    <div className="flex items-center gap-2 mt-1 text-sm font-semibold text-blue-800">
+
+                                                                        <span>
+                                                                            {order.status}
+                                                                        </span>
+
+                                                                        <span>→</span>
+
+                                                                        <span>
+                                                                            {selectedStatus}
+                                                                        </span>
+
+                                                                    </div>
+
+                                                                </div>
+
+                                                            )}
+
+                                                            {/* Update Button */}
+                                                            <button
+                                                                type="button"
+                                                                onClick={() =>
+                                                                    handleUpdateOrderStatus(
+                                                                        order._id
+                                                                    )
+                                                                }
+                                                                disabled={
+                                                                    !isStatusChanged ||
+                                                                    isUpdating
+                                                                }
+                                                                className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 rounded-lg text-sm transition disabled:bg-gray-300 disabled:text-gray-500 disabled:cursor-not-allowed"
+                                                            >
+
+                                                                {isUpdating ? (
+
+                                                                    <>
+                                                                        <svg
+                                                                            className="animate-spin h-4 w-4"
+                                                                            viewBox="0 0 24 24"
+                                                                            fill="none"
+                                                                        >
+                                                                            <circle
+                                                                                className="opacity-25"
+                                                                                cx="12"
+                                                                                cy="12"
+                                                                                r="10"
+                                                                                stroke="currentColor"
+                                                                                strokeWidth="4"
+                                                                            />
+
+                                                                            <path
+                                                                                className="opacity-75"
+                                                                                fill="currentColor"
+                                                                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                                                                            />
+                                                                        </svg>
+
+                                                                        Updating...
+
+                                                                    </>
+
+                                                                ) : (
+
+                                                                    "Update Order Status"
+
+                                                                )}
+
+                                                            </button>
+
+                                                        </div>
+
+                                                    </div>
+
+                                                </div>
+
                                             </div>
 
-                                            {product.status === "pending" && (
-                                                <div className="px-5 py-4 bg-gray-50 border-t flex justify-end gap-2">
-                                                    <button
-                                                        type="button"
-                                                        disabled={actionLoading}
-                                                        onClick={() =>
-                                                            productStatus(
-                                                                product._id,
-                                                                1,
-                                                                ""
-                                                            )
-                                                        }
-                                                        className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm disabled:opacity-50"
-                                                    >
-                                                        Approve
-                                                    </button>
+                                        );
 
-                                                    <button
-                                                        type="button"
-                                                        disabled={actionLoading}
-                                                        onClick={() =>
-                                                            handleRejectProduct(
-                                                                product
-                                                            )
-                                                        }
-                                                        className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm disabled:opacity-50"
-                                                    >
-                                                        Reject
-                                                    </button>
-                                                </div>
-                                            )}
-                                        </div>
-                                    ))}
+                                    })}
+
                                 </div>
+
                             )}
+
+                            {/* Pagination */}
+                            {!loading && pagination.totalPages > 1 && (
+
+                                <div className="flex justify-center items-center gap-4 mt-8">
+
+                                    <button
+                                        disabled={pagination.currentPage <= 1}
+                                        onClick={() =>
+                                            fetchOrders(pagination.currentPage - 1)
+                                        }
+                                        className="px-4 py-2 border rounded-lg disabled:opacity-40 hover:bg-gray-50"
+                                    >
+                                        Previous
+                                    </button>
+
+                                    <span className="text-sm">
+                                        Page {pagination.currentPage} of {pagination.totalPages}
+                                    </span>
+
+                                    <button
+                                        disabled={
+                                            pagination.currentPage >= pagination.totalPages
+                                        }
+                                        onClick={() =>
+                                            fetchOrders(pagination.currentPage + 1)
+                                        }
+                                        className="px-4 py-2 border rounded-lg disabled:opacity-40 hover:bg-gray-50"
+                                    >
+                                        Next
+                                    </button>
+
+                                </div>
+
+                            )}
+
                         </div>
                     )}
 

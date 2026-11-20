@@ -4,7 +4,7 @@ const productSchema = new Schema(
   {
     sellerId: {
       type: Schema.Types.ObjectId,
-      ref: "User",
+      ref: "SellerProfile",
       required: true,
       index: true
     },

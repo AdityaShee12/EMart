@@ -808,7 +808,6 @@ const getAdvertisement = asyncHandler(async (req, res) => {
                 "name email role avatar"
             )
             .sort({ createdAt: -1 });
-        console.log("Advertisement1", advertisements);
 
         return res.status(200).json({
             success: true,

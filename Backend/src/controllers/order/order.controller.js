@@ -270,41 +270,81 @@ const getMyOrders = async (req, res) => {
 const getOrders = async (req, res) => {
   try {
 
-    const { userId } = req.query;
-    console.log("UserId", userId);
+    // Pagination
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 10));
+    const skip = (page - 1) * limit;
 
-    // Validate userId
-    if (!userId || !mongoose.isValidObjectId(userId)) {
-      return res.status(400).json({
-        success: false,
-        message: "Valid userId is required",
-      });
+    // Optional Filters
+    const { status, paymentStatus } = req.query;
+
+    const filter = {};
+
+    if (status) {
+      filter.status = status;
     }
 
-    // Fetch user's orders
-    const orders = await Order.find({
-      buyerId: userId,
-    })
-      .populate("productId", "name images")
+    if (paymentStatus) {
+      filter.paymentStatus = paymentStatus;
+    }
+
+    // Total Orders Count
+    const totalOrders = await Order.countDocuments(filter);
+
+    // Fetch All Orders
+    const orders = await Order.find(filter)
+
+      // Buyer Information
+      .populate(
+        "buyerId",
+        "name email phone"
+      )
+
+      // Product + Seller Information
+      .populate({
+        path: "productId",
+        select: "name images price sellerId",
+
+        populate: {
+          path: "sellerId",
+          select: "name email"
+        }
+      })
+
+      // Latest Orders First
       .sort({ createdAt: -1 })
+
+      // Pagination
+      .skip(skip)
+      .limit(limit)
       .lean();
 
     return res.status(200).json({
       success: true,
-      message: "Orders fetched successfully",
+      message: "All orders fetched successfully",
+
       data: {
         orders,
-      },
+
+        pagination: {
+          currentPage: page,
+          totalPages: Math.ceil(totalOrders / limit),
+          totalOrders,
+          limit
+        }
+      }
     });
 
   } catch (error) {
 
-    console.error("getMyOrders:", error);
+    console.error("getOrders Error:", error);
 
     return res.status(500).json({
       success: false,
       message: "Failed to fetch orders",
+      error: error.message
     });
+
   }
 };
 
@@ -404,69 +444,59 @@ const updateOrderStatus = async (req, res) => {
   try {
     const { orderId } = req.params;
     const { status } = req.body;
+    console.log("ORder", req.body);
+
+    const allowedStatuses = [
+      "pending",
+      "confirmed",
+      "processing",
+      "shipped",
+      "delivered",
+      "cancelled",
+      "returned"
+    ];
 
     if (!mongoose.isValidObjectId(orderId)) {
       return res.status(400).json({
         success: false,
-        message: "Invalid order ID",
+        message: "Invalid order ID"
       });
     }
 
-    if (!validStatuses.includes(status)) {
+    if (!allowedStatuses.includes(status)) {
       return res.status(400).json({
         success: false,
-        message: "Invalid order status",
+        message: "Invalid order status"
       });
     }
 
-    const order = await Order.findById(orderId);
+    const updatedOrder = await Order.findByIdAndUpdate(
+      orderId,
+      { $set: { status } },
+      { new: true, runValidators: true }
+    );
 
-    if (!order) {
+    if (!updatedOrder) {
       return res.status(404).json({
         success: false,
-        message: "Order not found",
+        message: "Order not found"
       });
-    }
-
-    const allowedTransitions = {
-      pending: ["confirmed", "cancelled"],
-      confirmed: ["processing", "cancelled"],
-      processing: ["shipped", "cancelled"],
-      shipped: ["delivered"],
-      delivered: ["returned"],
-      cancelled: [],
-      returned: [],
-    };
-
-    if (!allowedTransitions[order.status]?.includes(status)) {
-      return res.status(400).json({
-        success: false,
-        message: `Cannot change status from ${order.status} to ${status}`,
-      });
-    }
-
-    order.status = status;
-    await order.save();
-
-    // Restock only when an admin cancels an order.
-    if (status === "cancelled") {
-      await Product.updateOne(
-        { _id: order.productId },
-        { $inc: { quantity: 1 } }
-      );
     }
 
     return res.status(200).json({
       success: true,
       message: "Order status updated successfully",
-      data: { order },
+      data: {
+        order: updatedOrder
+      }
     });
+
   } catch (error) {
-    console.error("updateOrderStatus:", error);
+    console.error("Update Order Status:", error);
 
     return res.status(500).json({
       success: false,
-      message: "Failed to update order status",
+      message: "Failed to update order status"
     });
   }
 };
